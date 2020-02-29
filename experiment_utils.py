@@ -1,8 +1,13 @@
 import os
+import warnings
+
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
 from multiprocessing import pool
+from heldkarp import held_karp
+from fitnesses import QueensCustom
+from scipy.special import comb
 
 import mlrose
 from mlrose import ExpDecay
@@ -15,7 +20,13 @@ from tqdm import tqdm
 MAX_ITERS = 5000
 MAX_ATTEMPTS = 10
 EVALUATION_COUNT = 0
-METRICS = ["Time Elapsed", "Best Fitness", "Fitness Evaluations"]
+METRICS = [
+    "Time Elapsed",
+    "Best Fitness",
+    "Fitness Evaluations",
+    "Global Optimum",
+    "Found Global Optimum",
+]
 OUTPUT_DIR = "output"
 MAX_RESTARTS = 10
 
@@ -29,7 +40,6 @@ GRID = {
             ExpDecay(exp_const=0.05),
             ExpDecay(exp_const=0.1),
         ],
-        "max_attempts": [1000],
     },
     "ga": {"pop_size": [200], "mutation_prob": [0.05, 0.1, 0.2, 0.4]},
     "mimic": {"pop_size": [200], "keep_pct": [0.1, 0.3, 0.5, 0.7, 0.9]},
@@ -48,18 +58,31 @@ def count_evaluations(fitness_fn, *args, **kwargs):
 
 def calculate_knapsack_global_optimum(values, weights, n_items, capacity):
     """The dynamic programming solution for the 0-1 knapsack problem as given in https://en.wikipedia.org/wiki/Knapsack_problem#0-1_knapsack_problem"""
-    m = np.zeros((n_items, capacity))
+    m = np.zeros((n_items, capacity + 1))
     for j in range(capacity):
         pass
 
-    for i in range(1, n_items):
-        for j in range(capacity):
+    for i in range(0, n_items):
+        for j in range(capacity + 1):
             if weights[i] > j:
                 m[i, j] = m[i - 1, j]
             else:
                 m[i, j] = max(m[i - 1, j], m[i - 1, j - weights[i]] + values[i])
 
     return m.max()  # The maximum value
+
+
+def generate_distances(coords):
+    N = len(coords)
+    dists = np.zeros((N, N), dtype=np.float64)
+    for i in range(N - 1):
+        for j in range(i + 1, N):
+            node1 = coords[i]
+            node2 = coords[j]
+            dist = np.sqrt((node1[0] - node2[0]) ** 2 + (node1[1] - node2[1]) ** 2)
+            dists[i, j] = dists[j, i] = dist
+
+    return dists
 
 
 def instantiate_problem_factories():
@@ -71,7 +94,7 @@ def instantiate_problem_factories():
         global_optimum = length - 1
         return flipflop, global_optimum
 
-    def fourpeaks_factory(length=50, t_pct=0.1):
+    def fourpeaks_factory(length=100, t_pct=0.1):
         fourpeaks_fitness = count_evaluations(mlrose.FourPeaks, t_pct=t_pct)
         fourpeaks_fitness_final = mlrose.CustomFitness(fourpeaks_fitness)
         fourpeaks = mlrose.DiscreteOpt(
@@ -86,22 +109,64 @@ def instantiate_problem_factories():
         weights = np.random.randint(1, high=max_weight, size=N_items)
         values = np.random.randint(1, high=max_value, size=N_items)
 
+        capacity = int(np.ceil(max_weight_pct * weights.sum()))
+
         global_optimum = calculate_knapsack_global_optimum(
-            values, weights, N_items, np.ceil(max_weight_pct * weights.sum())
+            values, weights, N_items, capacity
         )
 
         knapsack_fitness = count_evaluations(
             mlrose.Knapsack, weights, values, max_weight_pct
         )
+
         knapsack_fitness_final = mlrose.CustomFitness(knapsack_fitness)
         knapsack = mlrose.DiscreteOpt(length=N_items, fitness_fn=knapsack_fitness_final)
 
         return knapsack, global_optimum
 
+    def tsp_factory(length=10, min_nodeval=1, max_nodeval=20):
+
+        coords = []
+        for i in range(length):
+
+            node = (
+                np.random.randint(min_nodeval, max_nodeval),
+                np.random.randint(min_nodeval, max_nodeval),
+            )
+            while node in coords:
+                node = (
+                    np.random.randint(min_nodeval, max_nodeval),
+                    np.random.randint(min_nodeval, max_nodeval),
+                )
+
+            coords.append(node)
+
+        fitness = count_evaluations(mlrose.TravellingSales, coords)
+        fitness_final = mlrose.CustomFitness(fitness)
+        fitness_final.get_prob_type = (
+            lambda: "tsp"
+        )  # Just a hack to make it work with a custom function.
+
+        problem = mlrose.TSPOpt(length=length, fitness_fn=fitness_final, maximize=False)
+        dists = generate_distances(coords)
+        optimum, _ = held_karp(dists)
+
+        return problem, optimum
+
+    def queens_factory(length=8):
+        fitness = count_evaluations(QueensCustom)
+        fitness_final = mlrose.CustomFitness(fitness)
+        problem = mlrose.DiscreteOpt(length=length, fitness_fn=fitness_final, max_val=length)
+        global_optimum = int(comb(length, 2))  # I think?
+
+        return problem, global_optimum
+
     return {
         "fourpeaks": fourpeaks_factory,
         "knapsack": knapsack_factory,
         "flipflop": flipflop_factory,
+        "tsp": tsp_factory,
+        "queens": queens_factory,
     }
 
 
@@ -118,6 +183,14 @@ UNIVERSAL_PARAMETERS = {
     "curve": True,
     "max_iters": MAX_ITERS,
     "max_attempts": MAX_ATTEMPTS,
+}
+
+PROBLEM_GRID = {
+    "knapsack": {"N_items": [20, 40, 60, 80, 100]},
+    "fourpeaks": {"t_pct": [0.1, 0.2, 0.3, 0.4]},
+    "flipflop": {"length": [20, 40, 60, 80, 100]},
+    "tsp": {"length": [10, 12, 14, 16, 18]},
+    "queens": {"length": [10, 20, 30, 40, 50]},
 }
 
 
@@ -177,7 +250,7 @@ def run_gridsearch_experiments(
 
 
 def run_reliability_experiments(
-    problem_name, output_dir="output", params=None, exclude=[]
+    problem_name, output_dir="output", params=None, problem_space={}, exclude=[]
 ):
     """run_reliability_experiments
 
@@ -196,16 +269,25 @@ def run_reliability_experiments(
     algos = set(["rhc", "sa", "ga", "mimic"]) - set(exclude)
     for algo_name in algos:
         if not params:
+            # If algorithm parameters weren't provided, see if there are results in output folder to draw from
             gsearch_file = generate_gsearch_filename(
                 problem_name, algo_name, OUTPUT_DIR
             )
             param_df = pd.read_csv(gsearch_file, index_col=0)
             algo_params = extract_best_hyperparameters(param_df)
         else:
-            algo_params = params[algo_name]
+            try:
+                algo_params = params[algo_name]
+            except:
+                warnings.warn(
+                    f"Couldn't find parameters for algorithm {algo_name}. Continuing with default parameters"
+                )
+                algo_params = {}
 
         algo = ALGO_KEYMAP[algo_name]
-        results, curves = reliability_test(problem_name, algo, algo_params)
+        results, curves = reliability_test(
+            problem_name, algo, algo_params, problem_space=problem_space
+        )
 
         results_output_path = os.path.join(
             output_dir, f"{algo_name}_{problem_name}_reliability.csv"
@@ -230,7 +312,7 @@ def grid_search(problem, global_optimum, algo, parameter_grid, cores=-1):
         "Best Fitness",
         "Fitness Evaluations",
         "Global Optimum",
-        "Found Global Optimum"
+        "Found Global Optimum",
     ]
 
     N_cols = len(columns)
@@ -250,14 +332,17 @@ def grid_search(problem, global_optimum, algo, parameter_grid, cores=-1):
         best_fitness = -1
 
         while best_fitness < global_optimum and restart_count < MAX_RESTARTS:
-            print(f"Attempt Number {restart_count+1}")
-            _, fitness, curve = run_optimizer(algo, problem, params)
+            try:
+                _, fitness, curve = run_optimizer(algo, problem, params)
 
-            if fitness > best_fitness:
-                best_fitness = fitness
+                if fitness > best_fitness:
+                    best_fitness = fitness
 
-            total_evaluations += EVALUATION_COUNT
-            restart_count += 1
+                total_evaluations += EVALUATION_COUNT
+                restart_count += 1
+            except ValueError:
+                print("Math Domain Error")
+                continue
 
         end = datetime.now()
         time_elapsed = end - start
@@ -274,29 +359,62 @@ def grid_search(problem, global_optimum, algo, parameter_grid, cores=-1):
     return result_df
 
 
-def reliability_test(problem_name, algo, algo_parameters, problem_grid={}, N_tests=20):
+def reliability_test(problem_name, algo, algo_parameters, problem_space={}, N_tests=20):
     curves = {}
 
-    result_df = pd.DataFrame(np.zeros((N_tests, len(METRICS))), columns=METRICS)
+    assert (
+        len(problem_space) == 1
+    ), "Reliability test only supports one variable in problem instantiation"
 
-    for i in tqdm(range(N_tests)):
-        np.random.seed(i)  # For replicability
+    key = list(problem_space)[0]
+    values = problem_space[key]
 
-        problem, global_optimum = PROBLEM_MAP[
-            problem_name
-        ]()  # New random problem instantiation
-        start = datetime.now()
-        best_fitness = None
+    result_df = pd.DataFrame(
+        np.zeros((N_tests * len(values), len(METRICS) + 2)),
+        columns=METRICS + ["Parameter Value", "Iterations"],
+    )
+    for i, param in enumerate(values):
+        print(f"Running Test with {key}: {param}")
+        j = 0
+        error_count = 0  # Weird float errors that I can't fix
+        pbar = tqdm(total=N_tests)
+        while j < N_tests:
 
-        best_state, best_fitness, curve = run_optimizer(algo, problem, algo_parameters)
-        end = datetime.now()
+            try:
+                row = i * N_tests + j
+                kwargs = {key: param}
 
-        time_elapsed = end - start
-        result_df.iloc[i]["Time Elapsed"] = parse_parameter_value(time_elapsed)
-        result_df.iloc[i]["Best Fitness"] = best_fitness
-        result_df.iloc[i]["Fitness Evaluations"] = EVALUATION_COUNT
-        result_df.iloc[i]["Global Optimum"] = global_optimum
-        curves[i] = curve.tolist()
+                np.random.seed(j + error_count)  # For replicability
+
+                problem, global_optimum = PROBLEM_MAP[problem_name](
+                    **kwargs
+                )  # New random problem instantiation
+                start = datetime.now()
+
+                best_state, best_fitness, curve = run_optimizer(
+                    algo, problem, algo_parameters
+                )
+                end = datetime.now()
+
+                time_elapsed = end - start
+
+                result_df.iloc[row]["Time Elapsed"] = parse_parameter_value(
+                    time_elapsed
+                )
+                result_df.iloc[row]["Best Fitness"] = best_fitness
+                result_df.iloc[row]["Fitness Evaluations"] = EVALUATION_COUNT
+                result_df.iloc[row]["Global Optimum"] = global_optimum
+                result_df.iloc[row]["Parameter Value"] = param
+                result_df.iloc[row]["Iterations"] = len(curve)
+
+                curve_key = f"{key}_{param}_{i}"
+                curves[curve_key] = curve.tolist()
+                j += 1
+                pbar.update(j)
+            except ValueError as e:
+                print("Math Error")
+                error_count += 1
+                continue
 
     return result_df, curves
 
@@ -368,5 +486,28 @@ def collect_final_results(problem, algo, parameters):
 # results = run_optimization_experiment("knapsack", GRID)
 #
 #
+results_knapsack = run_gridsearch_experiments("knapsack", GRID)
+results_flipflop = run_gridsearch_experiments("flipflop", GRID)
+results_fourpeaks = run_gridsearch_experiments("fourpeaks", GRID)
+results_tsp = run_gridsearch_experiments("tsp", GRID)
+results_queens = run_gridsearch_experiments("queens", GRID)
 
-results = run_gridsearch_experiments("knapsack", GRID)
+
+run_reliability_experiments(
+    "knapsack", OUTPUT_DIR, problem_space=PROBLEM_GRID["knapsack"]
+)
+
+run_reliability_experiments(
+    "flipflop", OUTPUT_DIR, problem_space=PROBLEM_GRID["flipflop"]
+)
+
+run_reliability_experiments(
+    "fourpeaks", OUTPUT_DIR, problem_space=PROBLEM_GRID["fourpeaks"]
+)
+
+run_reliability_experiments(
+    "tsp", OUTPUT_DIR, problem_space=PROBLEM_GRID["tsp"]
+)
+run_reliability_experiments(
+    "queens", OUTPUT_DIR, problem_space=PROBLEM_GRID["queens"]
+)
