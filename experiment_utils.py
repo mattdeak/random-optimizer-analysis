@@ -95,7 +95,7 @@ def instantiate_problem_factories():
         global_optimum = length - 1
         return flipflop, global_optimum
 
-    def fourpeaks_factory(length=30, t_pct=0.1):
+    def fourpeaks_factory(length=50, t_pct=0.1):
         fourpeaks_fitness = count_evaluations(mlrose.FourPeaks, t_pct=t_pct)
         fourpeaks_fitness_final = mlrose.CustomFitness(fourpeaks_fitness)
         fourpeaks = mlrose.DiscreteOpt(
@@ -188,7 +188,7 @@ UNIVERSAL_PARAMETERS = {
 
 PROBLEM_GRID = {
     "knapsack": {"N_items": [20, 40, 60, 80, 100]},
-    "fourpeaks": {"length": [50, 70, 90, 110, 130]},
+    "fourpeaks": {"length": [50, 60, 70, 80, 90]},
     "flipflop": {"length": [20, 40, 60, 80, 100]},
     "tsp": {"length": [10, 12, 14, 16, 18]},
     "queens": {"length": [10, 20, 30, 40, 50]},

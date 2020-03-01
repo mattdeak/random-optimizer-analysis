@@ -1,9 +1,11 @@
 import mlrose
 import os
 import pandas as pd
+import tqdm
 
 from data_utils import load_intention
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import log_loss
 from sklearn.model_selection import KFold
 from sklearn.neural_network import MLPClassifier
 from mlrose import ExpDecay
@@ -152,6 +154,7 @@ def collect_nn_results(
     max_iters=500,
     extract_params=True,
     collect_lc=False,
+    collect_final_results=True
 ):
     algo_map = {
         "ga": "genetic_alg",
@@ -161,6 +164,8 @@ def collect_nn_results(
     }
 
     if extract_params:
+
+
         if algo == "gs":  # Use mlpclassifier
             # Use MLP Classifier to keep consistent with old results. Should be identical to mlrose except supports ADAM optimizer and is more efficient.
             nn = MLPClassifier(
@@ -201,54 +206,70 @@ def collect_nn_results(
         random_state=RANDOM_STATE,
         train_size=TRAIN_PCT,
     )
-    # Collect train and test scores
-    start = datetime.datetime.now()
-    nn.fit(Xtrain, ytrain)
-    end = datetime.datetime.now()
+    if collect_final_results:
 
-    train_time = (end - start).total_seconds()
+        print("Collecting Final Results")
 
-    train_preds = nn.predict(Xtrain)
-    test_preds = nn.predict(Xtest)
 
-    train_acc = accuracy_score(ytrain, train_preds)
-    train_f1 = f1_score(ytrain, train_preds)
+        for i in tqdm.tqdm(range(runs)):
+            # Collect train and test scores
+            nn.random_state=i 
+            start = datetime.datetime.now()
+            nn.fit(Xtrain, ytrain)
+            end = datetime.datetime.now()
 
-    test_acc = accuracy_score(ytest, test_preds)
-    test_f1 = f1_score(ytest, test_preds)
+            train_time = (end - start).total_seconds()
 
-    # Iterations Until Best Fit
-    if algo == "gs":
-        iterations = len(nn.loss_curve_)
-        loss = nn.loss_
-    else:
-        iterations = len(nn.fitness_curve)
-        loss = -nn.fitness_curve[-1]
+            train_preds = nn.predict(Xtrain)
+            test_preds = nn.predict(Xtest)
 
-    results_data = pd.Series(
-        {
-            "Train_Acc": train_acc,
-            "Test_Acc": test_acc,
-            "Train_F1": train_f1,
-            "Test_F1": test_f1,
-            "Train_Time": train_time,
-            "Iterations": iterations,
-            "Final_Loss": loss
-        }
-    )
-    results_data.to_csv(os.path.join(output_dir, f"{algo}_nn_results.csv"))
+            train_acc = accuracy_score(ytrain, train_preds)
+            train_f1 = f1_score(ytrain, train_preds)
+
+            test_acc = accuracy_score(ytest, test_preds)
+            test_f1 = f1_score(ytest, test_preds)
+
+            # Iterations Until Best Fit
+            if algo == "gs":
+                iterations = len(nn.loss_curve_)
+                preds = nn.predict_proba(Xtrain)
+                loss = log_loss(ytrain, preds)
+            else:
+                iterations = len(nn.fitness_curve)
+                loss = -nn.fitness_curve[-1]
+
+            results_data = pd.Series(
+                {
+                    "Train_Acc": train_acc,
+                    "Test_Acc": test_acc,
+                    "Train_F1": train_f1,
+                    "Test_F1": test_f1,
+                    "Train_Time": train_time,
+                    "Iterations": iterations,
+                    "Final_Loss": loss
+                }
+            )
+            if i == 0:
+                results_df = results_data.to_frame(name=f'{i}')
+            else:
+                results_df = results_df.join(results_data.to_frame(name=f'{i}'))
+        results_df.to_csv(os.path.join(output_dir, f"{algo}_nn_results.csv"))
 
     # Collect Learning Curves
     if collect_lc:
         curves = []
-        for i in range(runs):
+        for i in tqdm.tqdm(range(runs)):
+            nn_params = NN_PARAMS.copy()
+            nn_params['random_state'] = i
             Xtrain, Xtest, ytrain, ytest = train_test_split(
                 X.values, y.values, shuffle=True, random_state=i, train_size=TRAIN_PCT
             )
-            nn.fit(Xtrain, ytrain)
             if algo == "gs":
+                nn.fit(X, y)
                 losses = nn.loss_curve_
             else:
+                nn.random_state=i
+                nn.fit(Xtrain, ytrain)
                 losses = -nn.fitness_curve
             curves.append(losses)
 
@@ -287,7 +308,6 @@ def extract_best_hyperparameters(algo, output_dir):
         elif value.is_integer():
             best_params[key] = int(value)
 
-    print(best_params)
     return best_params
 
 def run_all():
@@ -308,11 +328,11 @@ if __name__ == "__main__":
     # rhc_results = collect_grid_search_data('random_hill_climb', 'output/rhc_nn_gsresults.csv')
     # sa_results = collect_grid_search_data('simulated_annealing', 'output/sa_nn_gsresults.csv')
     # ga_results = collect_grid_search_data('genetic_alg', 'output/ga_nn_gsresults.csv')
-    # print("Extracting Gradient Descent LC")
-    collect_nn_results(X, y, "gs", "output", extract_params=False, max_iters=2000)
+    print("Extracting Gradient Descent LC")
+    collect_nn_results(X, y, "gs", "output", extract_params=False, max_iters=2000, collect_lc=False, collect_final_results=True)
     print("Extracting Genetic Alg LC")
-    collect_nn_results(X, y, "ga", "output", extract_params=True, max_iters=2000)
+    collect_nn_results(X, y, "ga", "output", extract_params=True, max_iters=2000, collect_lc=False, collect_final_results=True)
     print("Extracting Random Hill Climb LC")
-    collect_nn_results(X, y, "rhc", "output", extract_params=True, max_iters=2000)
+    collect_nn_results(X, y, "rhc", "output", extract_params=True, max_iters=2000, collect_lc=False, collect_final_results=True)
     print("Extracting Simulated Annealling LC")
-    collect_nn_results(X, y, "sa", "output", extract_params=True, max_iters=2000)
+    collect_nn_results(X, y, "sa", "output", extract_params=True, max_iters=2000, collect_lc=False, collect_final_results=True)

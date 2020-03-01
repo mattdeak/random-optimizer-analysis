@@ -345,16 +345,24 @@ def plot_all_comparisons(problem_name, x_name):
         )
 
 
-def plot_nn_lc(algorithm_name):
+def plot_nn_lc(algorithm_name, title):
 
     filename = os.path.join(OUTPUT_DIR, f"{algorithm_name}_nn_curves.npy")
     arr = np.load(filename, allow_pickle=True)
-    arr = (
-        -arr
-    )  # Loss function is negative because of optimization reasons. Gotta correct that.
+
+
+
     mean = arr.mean(axis=1)
-    std = arr.std(axis=1)
-    xs = np.arange(arr.shape[0])
+
+    
+    last_value = mean[-1]
+    end_ix = np.argwhere(mean != last_value)[-1][0] + 1
+
+    mean = mean[:end_ix]
+
+    std = arr[:end_ix, :].std(axis=1)
+    xs = np.arange(end_ix)
+
 
     fig, ax = plt.subplots(1, 1)
 
@@ -365,8 +373,16 @@ def plot_nn_lc(algorithm_name):
     ax.set_ylabel("Log Loss")
     ax.set_ylim(bottom=0)
 
+    # Find index at which improvement stops.
+    
+    
+    ax.set_xlim((0, end_ix-1))
+    ax.set_title(title)
+    ax.grid()
+
     # Find minimal loss
-    plt.show()
+    
+    plt.savefig(os.path.join(OUTPUT_DIR, f'{algorithm_name}_nn_curve.png'))
 
 
 def plot_nn_gsearch(algorithm_name):
@@ -384,22 +400,16 @@ def plot_nn_gsearch(algorithm_name):
     train_pivotted = mean_scores.pivot(
         index=params[0], columns=params[1], values="Train_F1"
     )
-    loss_pivotted = mean_scores.pivot(
-        index=params[0], columns=params[1], values="Final_Loss"
-    )
 
-    fig, axes = plt.subplots(1, 3)
+    fig, axes = plt.subplots(1, 2, figsize=(10, 4))
     ax1 = axes[0]
     ax2 = axes[1]
-    ax3 = axes[2]
 
     sns.heatmap(train_pivotted, vmin=0, vmax=1, cmap="Blues", annot=True, ax=ax1)
     sns.heatmap(val_pivotted, vmin=0, vmax=1, cmap="Blues", annot=True, ax=ax2)
-    sns.heatmap(val_pivotted, vmin=0, vmax=1, cmap="Blues", annot=True, ax=ax2)
 
-    ax1.set_title("Train F1 Score")
-    ax2.set_title("Val F1 Score")
-    ax3.set_title("Final Loss")
+    ax1.set_title(f"{algorithm_name.upper()}: Train F1 Score")
+    ax2.set_title(f"{algorithm_name.upper()}: Val F1 Score")
 
     outfile_name = os.path.join(OUTPUT_DIR, f'{algorithm_name}_nn_gridsearch.png')
 
@@ -439,6 +449,7 @@ def plot_nn_gridsearches():
 # plot_comparison(df_rhc, df_sa, df_ga, df_mimic, "Number of Queens", "Mean Fitness Ratio", "Fitnes Ratio", y_name_alternate="Fitness Ratio", error_name="STD Fitness Ratio")
 
 
+# plot_nn_gridsearches()
 # plot_all_gridsearches("fourpeaks")
 # plot_all_comparisons("tsp", "Cities")
 # plot_all_gridsearches("knapsack")
@@ -450,4 +461,9 @@ def plot_nn_gridsearches():
 # plot_all_comparisons("fourpeaks", "Size of Problem Space (bits)")
 
 
-plot_nn_gridsearches()
+# plot_nn_gridsearches()
+
+plot_nn_lc('ga', title='Genetic Algorithm Learning Curve')
+plot_nn_lc('gs', title='Gradient Descent Learning Curve')
+plot_nn_lc('rhc', title='RHC Learning Curve')
+plot_nn_lc('sa', title='SA Learning Curve')
