@@ -8,6 +8,7 @@ from multiprocessing import pool
 from heldkarp import held_karp
 from fitnesses import QueensCustom
 from scipy.special import comb
+from sklearn.neural_network import MLPClassifier
 
 import mlrose
 from mlrose import ExpDecay
@@ -94,7 +95,7 @@ def instantiate_problem_factories():
         global_optimum = length - 1
         return flipflop, global_optimum
 
-    def fourpeaks_factory(length=100, t_pct=0.1):
+    def fourpeaks_factory(length=30, t_pct=0.1):
         fourpeaks_fitness = count_evaluations(mlrose.FourPeaks, t_pct=t_pct)
         fourpeaks_fitness_final = mlrose.CustomFitness(fourpeaks_fitness)
         fourpeaks = mlrose.DiscreteOpt(
@@ -187,7 +188,7 @@ UNIVERSAL_PARAMETERS = {
 
 PROBLEM_GRID = {
     "knapsack": {"N_items": [20, 40, 60, 80, 100]},
-    "fourpeaks": {"t_pct": [0.1, 0.2, 0.3, 0.4]},
+    "fourpeaks": {"length": [50, 70, 90, 110, 130]},
     "flipflop": {"length": [20, 40, 60, 80, 100]},
     "tsp": {"length": [10, 12, 14, 16, 18]},
     "queens": {"length": [10, 20, 30, 40, 50]},
@@ -486,28 +487,45 @@ def collect_final_results(problem, algo, parameters):
 # results = run_optimization_experiment("knapsack", GRID)
 #
 #
-results_knapsack = run_gridsearch_experiments("knapsack", GRID)
-results_flipflop = run_gridsearch_experiments("flipflop", GRID)
-results_fourpeaks = run_gridsearch_experiments("fourpeaks", GRID)
-results_tsp = run_gridsearch_experiments("tsp", GRID)
-results_queens = run_gridsearch_experiments("queens", GRID)
+# results_knapsack = run_gridsearch_experiments("knapsack", GRID)
+# results_flipflop = run_gridsearch_experiments("flipflop", GRID)
+# results_fourpeaks = run_gridsearch_experiments("fourpeaks", GRID)
+# results_tsp = run_gridsearch_experiments("tsp", GRID)
+# results_queens = run_gridsearch_experiments("queens", GRID)
 
 
-run_reliability_experiments(
-    "knapsack", OUTPUT_DIR, problem_space=PROBLEM_GRID["knapsack"]
-)
+# run_reliability_experiments(
+#     "knapsack", OUTPUT_DIR, problem_space=PROBLEM_GRID["knapsack"]
+# )
 
-run_reliability_experiments(
-    "flipflop", OUTPUT_DIR, problem_space=PROBLEM_GRID["flipflop"]
-)
+# run_reliability_experiments(
+#     "flipflop", OUTPUT_DIR, problem_space=PROBLEM_GRID["flipflop"]
+# )
 
-run_reliability_experiments(
-    "fourpeaks", OUTPUT_DIR, problem_space=PROBLEM_GRID["fourpeaks"]
-)
+# run_reliability_experiments(
+#     "fourpeaks", OUTPUT_DIR, problem_space=PROBLEM_GRID["fourpeaks"]
+# )
 
-run_reliability_experiments(
-    "tsp", OUTPUT_DIR, problem_space=PROBLEM_GRID["tsp"]
-)
-run_reliability_experiments(
-    "queens", OUTPUT_DIR, problem_space=PROBLEM_GRID["queens"]
-)
+# run_reliability_experiments(
+#     "tsp", OUTPUT_DIR, problem_space=PROBLEM_GRID["tsp"]
+# )
+# run_reliability_experiments(
+#     "queens", OUTPUT_DIR, problem_space=PROBLEM_GRID["queens"]
+# )
+
+
+def run_all(exclude=[],experiment_type='both'):
+    assert experiment_type in ['both','reliability','gridsearch'], f"Experiment type {type} not supported"
+    problems = set(['knapsack','flipflop','fourpeaks','tsp','queens']) - set(exclude)
+    for p in problems:
+        print(f"Running Experiment: {p}")
+        if experiment_type in ['both','gridsearch']:
+            run_gridsearch_experiments(p, GRID)
+        
+        if experiment_type in ['both','reliability']:
+            run_reliability_experiments(p, OUTPUT_DIR, problem_space=PROBLEM_GRID[p])
+
+
+if __name__ == "__main__":
+    run_all(exclude=['tsp','queens','flipflop','knapsack'])
+

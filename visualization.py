@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import seaborn as sns
 from matplotlib.ticker import MultipleLocator, AutoLocator
+import numpy as np
 
 OUTPUT_DIR = "output"
 
@@ -272,8 +273,20 @@ def plot_comparison(
     plt.close()
 
 
+def show_success_rate(reliability_df):
+    reliability_df["Success"] = (
+        reliability_df["Best Fitness"] == reliability_df["Global Optimum"]
+    )
+    grouped = reliability_df.groupby("Parameter Value")
+
+    success_rates = grouped["Success"].sum() / grouped["Success"].count()
+    print(success_rates)
+
+
 def get_reliability_df(problem_name, algorithm_name):
-    filepath = os.path.join(OUTPUT_DIR, f"{algorithm_name}_{problem_name}_reliability.csv")
+    filepath = os.path.join(
+        OUTPUT_DIR, f"{algorithm_name}_{problem_name}_reliability.csv"
+    )
     return pd.read_csv(filepath, index_col=0)
 
 
@@ -282,10 +295,10 @@ def plot_all_comparisons(problem_name, x_name):
 
     algos = ["rhc", "sa", "ga", "mimic"]
 
-    df_rhc = get_reliability_df(problem_name, 'rhc')
-    df_sa = get_reliability_df(problem_name, 'sa')
-    df_ga = get_reliability_df(problem_name, 'ga')
-    df_mimic = get_reliability_df(problem_name, 'mimic')
+    df_rhc = get_reliability_df(problem_name, "rhc")
+    df_sa = get_reliability_df(problem_name, "sa")
+    df_ga = get_reliability_df(problem_name, "ga")
+    df_mimic = get_reliability_df(problem_name, "mimic")
 
     X_names = [x_name] * 4
     y_names = [
@@ -301,7 +314,12 @@ def plot_all_comparisons(problem_name, x_name):
         "Iterations",
     ]
 
-    titles = ['Comparison of Fitness Scores','Comparison of Wall Clock Time','Comparison in # of Evaluations','Comparison in # of Iterations']
+    titles = [
+        "Comparison of Fitness Scores",
+        "Comparison of Wall Clock Time",
+        "Comparison in # of Evaluations",
+        "Comparison in # of Iterations",
+    ]
     error_names = [
         "STD Fitness Ratio",
         "STD Time",
@@ -309,12 +327,109 @@ def plot_all_comparisons(problem_name, x_name):
         "STD Iterations",
     ]
 
-
-    for x_name, y_name, title, y_alternate, error_name in zip(X_names, y_names, titles, y_labels, error_names):
+    for x_name, y_name, title, y_alternate, error_name in zip(
+        X_names, y_names, titles, y_labels, error_names
+    ):
         filename = f"{problem_name}_{title}.png"
-        plot_comparison(df_rhc, df_sa, df_ga, df_mimic, x_name, y_name, title, filename, y_name_alternate=y_alternate, error_name=error_name)
+        plot_comparison(
+            df_rhc,
+            df_sa,
+            df_ga,
+            df_mimic,
+            x_name,
+            y_name,
+            title,
+            filename,
+            y_name_alternate=y_alternate,
+            error_name=error_name,
+        )
 
 
+def plot_nn_lc(algorithm_name):
+
+    filename = os.path.join(OUTPUT_DIR, f"{algorithm_name}_nn_curves.npy")
+    arr = np.load(filename, allow_pickle=True)
+    arr = (
+        -arr
+    )  # Loss function is negative because of optimization reasons. Gotta correct that.
+    mean = arr.mean(axis=1)
+    std = arr.std(axis=1)
+    xs = np.arange(arr.shape[0])
+
+    fig, ax = plt.subplots(1, 1)
+
+    ax.plot(xs, mean)
+    ax.fill_between(xs, mean - std, mean + std, alpha=0.5)
+
+    ax.set_xlabel("Iterations")
+    ax.set_ylabel("Log Loss")
+    ax.set_ylim(bottom=0)
+
+    # Find minimal loss
+    plt.show()
+
+
+def plot_nn_gsearch(algorithm_name):
+    filename = os.path.join(OUTPUT_DIR, f"{algorithm_name}_nn_gsresults.csv")
+    METRICS = ["Train_Acc", "Train_F1", "Val_Acc", "Val_F1", "Train_Time", "Iterations"]
+
+    df = pd.read_csv(filename, index_col=0)
+    params = [col for col in df.columns if col not in METRICS + ["Fold"]]
+    print(params)
+
+    mean_scores = df.groupby(params).mean().reset_index()
+    val_pivotted = mean_scores.pivot(
+        index=params[0], columns=params[1], values="Val_F1"
+    )
+    train_pivotted = mean_scores.pivot(
+        index=params[0], columns=params[1], values="Train_F1"
+    )
+    loss_pivotted = mean_scores.pivot(
+        index=params[0], columns=params[1], values="Final_Loss"
+    )
+
+    fig, axes = plt.subplots(1, 3)
+    ax1 = axes[0]
+    ax2 = axes[1]
+    ax3 = axes[2]
+
+    sns.heatmap(train_pivotted, vmin=0, vmax=1, cmap="Blues", annot=True, ax=ax1)
+    sns.heatmap(val_pivotted, vmin=0, vmax=1, cmap="Blues", annot=True, ax=ax2)
+    sns.heatmap(val_pivotted, vmin=0, vmax=1, cmap="Blues", annot=True, ax=ax2)
+
+    ax1.set_title("Train F1 Score")
+    ax2.set_title("Val F1 Score")
+    ax3.set_title("Final Loss")
+
+    outfile_name = os.path.join(OUTPUT_DIR, f'{algorithm_name}_nn_gridsearch.png')
+
+    plt.savefig(outfile_name)
+    plt.close()
+
+
+def generate_nn_comparison_table(output_dir):
+    algos = ["gs", "ga", "rhc", "sa"]
+    srs = []
+    for algo in algos:
+        filename = os.path.join(output_dir, f"{algo}_nn_results.csv")
+        algo_df = pd.read_csv(filename, index_col=0).T
+        serie = pd.Series(algo_df.values[0], index=algo_df.columns)
+
+        srs.append(serie)
+
+    df = pd.DataFrame({k: v for k, v in zip(algos, srs)})
+    return df
+
+
+def plot_nn_gridsearches():
+    algos = ['ga','rhc','sa']
+    for algo in algos:
+        plot_nn_gsearch(algo)
+
+
+
+
+# plot_nn_lc("ga")
 # plot_comparison(df_rhc, df_sa, df_ga, df_mimic, "Number of Items in Knapsack", "Mean Fitness Ratio", "Fitness Ratio Comparison", y_name_alternate="Fitness Ratio", error_name= "STD Fitness Ratio")
 # df_mimic = pd.read_csv("output/mimic_queens_reliability.csv", index_col=0)
 # df_ga = pd.read_csv("output/ga_queens_reliability.csv", index_col=0)
@@ -324,7 +439,7 @@ def plot_all_comparisons(problem_name, x_name):
 # plot_comparison(df_rhc, df_sa, df_ga, df_mimic, "Number of Queens", "Mean Fitness Ratio", "Fitnes Ratio", y_name_alternate="Fitness Ratio", error_name="STD Fitness Ratio")
 
 
-plot_all_gridsearches("fourpeaks")
+# plot_all_gridsearches("fourpeaks")
 # plot_all_comparisons("tsp", "Cities")
 # plot_all_gridsearches("knapsack")
 # plot_all_gridsearches("flipflop")
@@ -332,4 +447,7 @@ plot_all_gridsearches("fourpeaks")
 # plot_sa_gsearch('output/sa_knapsack_gsresults.csv','Test.png','Test')
 # df = pd.read_csv('output/mimic_knapsack_gsresults.csv', index_col=0)
 # plot_all_comparisons("knapsack", "Number of Items")
-# plot_all_comparisons("fourpeaks", "Size of Input Space (bits)")
+# plot_all_comparisons("fourpeaks", "Size of Problem Space (bits)")
+
+
+plot_nn_gridsearches()
