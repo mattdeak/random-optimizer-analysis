@@ -462,8 +462,26 @@ def plot_nn_gridsearches():
 
 
 # plot_nn_gridsearches()
+def generate_all_plots():
 
-plot_nn_lc('ga', title='Genetic Algorithm Learning Curve')
-plot_nn_lc('gs', title='Gradient Descent Learning Curve')
-plot_nn_lc('rhc', title='RHC Learning Curve')
-plot_nn_lc('sa', title='SA Learning Curve')
+    plot_nn_lc('ga', title='Genetic Algorithm Learning Curve')
+    plot_nn_lc('gs', title='Gradient Descent Learning Curve')
+    plot_nn_lc('rhc', title='RHC Learning Curve')
+    plot_nn_lc('sa', title='SA Learning Curve')
+
+    plot_all_comparisons("knapsack", "Number of Items")
+    plot_all_comparisons("fourpeaks", "Size of Problem Space (bits)")
+    plot_all_comparisons("queens", "N-Queens")
+
+
+    plot_all_gridsearches('knapsack')
+    plot_all_gridsearches('queens')
+    plot_all_gridsearches('fourpeaks')
+    
+    df = generate_nn_comparison_table('output')
+    print("Final Results for Neural Network Experiment")
+    print(df)
+
+
+if __name__ == '__main__':
+    generate_all_plots()
