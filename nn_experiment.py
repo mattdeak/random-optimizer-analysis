@@ -290,6 +290,19 @@ def extract_best_hyperparameters(algo, output_dir):
     print(best_params)
     return best_params
 
+def run_all():
+    rhc_results = collect_grid_search_data('random_hill_climb', 'output/rhc_nn_gsresults.csv')
+    sa_results = collect_grid_search_data('simulated_annealing', 'output/sa_nn_gsresults.csv')
+    ga_results = collect_grid_search_data('genetic_alg', 'output/ga_nn_gsresults.csv')
+    print("Extracting Gradient Descent LC")
+    collect_nn_results(X, y, "gs", "output", extract_params=False, max_iters=2000)
+    print("Extracting Genetic Alg LC")
+    collect_nn_results(X, y, "ga", "output", extract_params=True, max_iters=2000)
+    print("Extracting Random Hill Climb LC")
+    collect_nn_results(X, y, "rhc", "output", extract_params=True, max_iters=2000)
+    print("Extracting Simulated Annealling LC")
+    collect_nn_results(X, y, "sa", "output", extract_params=True, max_iters=2000)
+
 
 if __name__ == "__main__":
     # rhc_results = collect_grid_search_data('random_hill_climb', 'output/rhc_nn_gsresults.csv')
