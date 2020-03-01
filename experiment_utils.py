@@ -1,22 +1,21 @@
+import json
 import os
 import warnings
-
 from collections import defaultdict
-from datetime import datetime
-from datetime import timedelta
+from datetime import datetime, timedelta
 from multiprocessing import pool
-from heldkarp import held_karp
-from fitnesses import QueensCustom
-from scipy.special import comb
-from sklearn.neural_network import MLPClassifier
 
 import mlrose
-from mlrose import ExpDecay
 import numpy as np
 import pandas as pd
+from mlrose import ExpDecay
+from scipy.special import comb
 from sklearn.model_selection import ParameterGrid
-import json
+from sklearn.neural_network import MLPClassifier
 from tqdm import tqdm
+
+from fitnesses import QueensCustom
+from heldkarp import held_karp
 
 MAX_ITERS = 5000
 MAX_ATTEMPTS = 10
@@ -157,7 +156,9 @@ def instantiate_problem_factories():
     def queens_factory(length=8):
         fitness = count_evaluations(QueensCustom)
         fitness_final = mlrose.CustomFitness(fitness)
-        problem = mlrose.DiscreteOpt(length=length, fitness_fn=fitness_final, max_val=length)
+        problem = mlrose.DiscreteOpt(
+            length=length, fitness_fn=fitness_final, max_val=length
+        )
         global_optimum = int(comb(length, 2))  # I think?
 
         return problem, global_optimum
@@ -467,65 +468,23 @@ def extract_best_hyperparameters(gridsearch_results):
     return best_params
 
 
-def collect_final_results(problem, algo, parameters):
-    """measure_reliability
-
-    Measures the reliability of an algorithm based on the variance in performance
-
-    Parameters
-    ----------
-
-    problem :
-    algo :
-    parameters :
-
-    Returns
-    -------
-    """
-
-
-# results = run_optimization_experiment("knapsack", GRID)
-#
-#
-# results_knapsack = run_gridsearch_experiments("knapsack", GRID)
-# results_flipflop = run_gridsearch_experiments("flipflop", GRID)
-# results_fourpeaks = run_gridsearch_experiments("fourpeaks", GRID)
-# results_tsp = run_gridsearch_experiments("tsp", GRID)
-# results_queens = run_gridsearch_experiments("queens", GRID)
-
-
-# run_reliability_experiments(
-#     "knapsack", OUTPUT_DIR, problem_space=PROBLEM_GRID["knapsack"]
-# )
-
-# run_reliability_experiments(
-#     "flipflop", OUTPUT_DIR, problem_space=PROBLEM_GRID["flipflop"]
-# )
-
-# run_reliability_experiments(
-#     "fourpeaks", OUTPUT_DIR, problem_space=PROBLEM_GRID["fourpeaks"]
-# )
-
-# run_reliability_experiments(
-#     "tsp", OUTPUT_DIR, problem_space=PROBLEM_GRID["tsp"]
-# )
-# run_reliability_experiments(
-#     "queens", OUTPUT_DIR, problem_space=PROBLEM_GRID["queens"]
-# )
-
-
-def run_all(exclude=[],experiment_type='both'):
-    assert experiment_type in ['both','reliability','gridsearch'], f"Experiment type {type} not supported"
-    problems = set(['knapsack','flipflop','fourpeaks','tsp','queens']) - set(exclude)
+def run_all(exclude=["tsp", "flipflop"], experiment_type="both"):
+    assert experiment_type in [
+        "both",
+        "reliability",
+        "gridsearch",
+    ], f"Experiment type {type} not supported"
+    problems = set(["knapsack", "flipflop", "fourpeaks", "tsp", "queens"]) - set(
+        exclude
+    )
     for p in problems:
         print(f"Running Experiment: {p}")
-        if experiment_type in ['both','gridsearch']:
+        if experiment_type in ["both", "gridsearch"]:
             run_gridsearch_experiments(p, GRID)
-        
-        if experiment_type in ['both','reliability']:
+
+        if experiment_type in ["both", "reliability"]:
             run_reliability_experiments(p, OUTPUT_DIR, problem_space=PROBLEM_GRID[p])
 
 
 if __name__ == "__main__":
-    run_all(exclude=['tsp','queens','flipflop','knapsack'])
-
+    run_all(exclude=["tsp", "queens", "flipflop", "knapsack"])

@@ -1,19 +1,17 @@
-import mlrose
+import datetime
 import os
+
+import mlrose
+import numpy as np
 import pandas as pd
 import tqdm
+from mlrose import ExpDecay
+from sklearn.metrics import accuracy_score, f1_score, log_loss
+from sklearn.model_selection import (KFold, ParameterGrid, learning_curve,
+                                     train_test_split)
+from sklearn.neural_network import MLPClassifier
 
 from data_utils import load_intention
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import log_loss
-from sklearn.model_selection import KFold
-from sklearn.neural_network import MLPClassifier
-from mlrose import ExpDecay
-import datetime
-from sklearn.metrics import accuracy_score, f1_score
-from sklearn.model_selection import ParameterGrid
-import numpy as np
-from sklearn.model_selection import learning_curve
 
 RANDOM_STATE = 5
 FOLDS = 5
@@ -154,7 +152,7 @@ def collect_nn_results(
     max_iters=500,
     extract_params=True,
     collect_lc=False,
-    collect_final_results=True
+    collect_final_results=True,
 ):
     algo_map = {
         "ga": "genetic_alg",
@@ -164,7 +162,6 @@ def collect_nn_results(
     }
 
     if extract_params:
-
 
         if algo == "gs":  # Use mlpclassifier
             # Use MLP Classifier to keep consistent with old results. Should be identical to mlrose except supports ADAM optimizer and is more efficient.
@@ -210,10 +207,9 @@ def collect_nn_results(
 
         print("Collecting Final Results")
 
-
         for i in tqdm.tqdm(range(runs)):
             # Collect train and test scores
-            nn.random_state=i 
+            nn.random_state = i
             start = datetime.datetime.now()
             nn.fit(Xtrain, ytrain)
             end = datetime.datetime.now()
@@ -246,13 +242,13 @@ def collect_nn_results(
                     "Test_F1": test_f1,
                     "Train_Time": train_time,
                     "Iterations": iterations,
-                    "Final_Loss": loss
+                    "Final_Loss": loss,
                 }
             )
             if i == 0:
-                results_df = results_data.to_frame(name=f'{i}')
+                results_df = results_data.to_frame(name=f"{i}")
             else:
-                results_df = results_df.join(results_data.to_frame(name=f'{i}'))
+                results_df = results_df.join(results_data.to_frame(name=f"{i}"))
         results_df.to_csv(os.path.join(output_dir, f"{algo}_nn_results.csv"))
 
     # Collect Learning Curves
@@ -260,7 +256,7 @@ def collect_nn_results(
         curves = []
         for i in tqdm.tqdm(range(runs)):
             nn_params = NN_PARAMS.copy()
-            nn_params['random_state'] = i
+            nn_params["random_state"] = i
             Xtrain, Xtest, ytrain, ytest = train_test_split(
                 X.values, y.values, shuffle=True, random_state=i, train_size=TRAIN_PCT
             )
@@ -268,7 +264,7 @@ def collect_nn_results(
                 nn.fit(X, y)
                 losses = nn.loss_curve_
             else:
-                nn.random_state=i
+                nn.random_state = i
                 nn.fit(Xtrain, ytrain)
                 losses = -nn.fitness_curve
             curves.append(losses)
@@ -310,10 +306,15 @@ def extract_best_hyperparameters(algo, output_dir):
 
     return best_params
 
+
 def run_all():
-    rhc_results = collect_grid_search_data('random_hill_climb', 'output/rhc_nn_gsresults.csv')
-    sa_results = collect_grid_search_data('simulated_annealing', 'output/sa_nn_gsresults.csv')
-    ga_results = collect_grid_search_data('genetic_alg', 'output/ga_nn_gsresults.csv')
+    rhc_results = collect_grid_search_data(
+        "random_hill_climb", "output/rhc_nn_gsresults.csv"
+    )
+    sa_results = collect_grid_search_data(
+        "simulated_annealing", "output/sa_nn_gsresults.csv"
+    )
+    ga_results = collect_grid_search_data("genetic_alg", "output/ga_nn_gsresults.csv")
     print("Extracting Gradient Descent LC")
     collect_nn_results(X, y, "gs", "output", extract_params=False, max_iters=2000)
     print("Extracting Genetic Alg LC")
@@ -325,14 +326,47 @@ def run_all():
 
 
 if __name__ == "__main__":
-    # rhc_results = collect_grid_search_data('random_hill_climb', 'output/rhc_nn_gsresults.csv')
-    # sa_results = collect_grid_search_data('simulated_annealing', 'output/sa_nn_gsresults.csv')
-    # ga_results = collect_grid_search_data('genetic_alg', 'output/ga_nn_gsresults.csv')
     print("Extracting Gradient Descent LC")
-    collect_nn_results(X, y, "gs", "output", extract_params=False, max_iters=2000, collect_lc=False, collect_final_results=True)
+    collect_nn_results(
+        X,
+        y,
+        "gs",
+        "output",
+        extract_params=False,
+        max_iters=2000,
+        collect_lc=False,
+        collect_final_results=True,
+    )
     print("Extracting Genetic Alg LC")
-    collect_nn_results(X, y, "ga", "output", extract_params=True, max_iters=2000, collect_lc=False, collect_final_results=True)
+    collect_nn_results(
+        X,
+        y,
+        "ga",
+        "output",
+        extract_params=True,
+        max_iters=2000,
+        collect_lc=False,
+        collect_final_results=True,
+    )
     print("Extracting Random Hill Climb LC")
-    collect_nn_results(X, y, "rhc", "output", extract_params=True, max_iters=2000, collect_lc=False, collect_final_results=True)
+    collect_nn_results(
+        X,
+        y,
+        "rhc",
+        "output",
+        extract_params=True,
+        max_iters=2000,
+        collect_lc=False,
+        collect_final_results=True,
+    )
     print("Extracting Simulated Annealling LC")
-    collect_nn_results(X, y, "sa", "output", extract_params=True, max_iters=2000, collect_lc=False, collect_final_results=True)
+    collect_nn_results(
+        X,
+        y,
+        "sa",
+        "output",
+        extract_params=True,
+        max_iters=2000,
+        collect_lc=False,
+        collect_final_results=True,
+    )

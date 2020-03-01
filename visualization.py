@@ -1,10 +1,11 @@
-import pandas as pd
 import os
-import matplotlib.pyplot as plt
+
 import matplotlib.patches as mpatches
-import seaborn as sns
-from matplotlib.ticker import MultipleLocator, AutoLocator
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
+from matplotlib.ticker import AutoLocator, MultipleLocator
 
 OUTPUT_DIR = "output"
 
@@ -350,11 +351,8 @@ def plot_nn_lc(algorithm_name, title):
     filename = os.path.join(OUTPUT_DIR, f"{algorithm_name}_nn_curves.npy")
     arr = np.load(filename, allow_pickle=True)
 
-
-
     mean = arr.mean(axis=1)
 
-    
     last_value = mean[-1]
     end_ix = np.argwhere(mean != last_value)[-1][0] + 1
 
@@ -362,7 +360,6 @@ def plot_nn_lc(algorithm_name, title):
 
     std = arr[:end_ix, :].std(axis=1)
     xs = np.arange(end_ix)
-
 
     fig, ax = plt.subplots(1, 1)
 
@@ -374,15 +371,14 @@ def plot_nn_lc(algorithm_name, title):
     ax.set_ylim(bottom=0)
 
     # Find index at which improvement stops.
-    
-    
-    ax.set_xlim((0, end_ix-1))
+
+    ax.set_xlim((0, end_ix - 1))
     ax.set_title(title)
     ax.grid()
 
     # Find minimal loss
-    
-    plt.savefig(os.path.join(OUTPUT_DIR, f'{algorithm_name}_nn_curve.png'))
+
+    plt.savefig(os.path.join(OUTPUT_DIR, f"{algorithm_name}_nn_curve.png"))
 
 
 def plot_nn_gsearch(algorithm_name):
@@ -411,7 +407,7 @@ def plot_nn_gsearch(algorithm_name):
     ax1.set_title(f"{algorithm_name.upper()}: Train F1 Score")
     ax2.set_title(f"{algorithm_name.upper()}: Val F1 Score")
 
-    outfile_name = os.path.join(OUTPUT_DIR, f'{algorithm_name}_nn_gridsearch.png')
+    outfile_name = os.path.join(OUTPUT_DIR, f"{algorithm_name}_nn_gridsearch.png")
 
     plt.savefig(outfile_name)
     plt.close()
@@ -432,56 +428,30 @@ def generate_nn_comparison_table(output_dir):
 
 
 def plot_nn_gridsearches():
-    algos = ['ga','rhc','sa']
+    algos = ["ga", "rhc", "sa"]
     for algo in algos:
         plot_nn_gsearch(algo)
 
 
-
-
-# plot_nn_lc("ga")
-# plot_comparison(df_rhc, df_sa, df_ga, df_mimic, "Number of Items in Knapsack", "Mean Fitness Ratio", "Fitness Ratio Comparison", y_name_alternate="Fitness Ratio", error_name= "STD Fitness Ratio")
-# df_mimic = pd.read_csv("output/mimic_queens_reliability.csv", index_col=0)
-# df_ga = pd.read_csv("output/ga_queens_reliability.csv", index_col=0)
-# df_sa = pd.read_csv("output/sa_queens_reliability.csv", index_col=0)
-# df_rhc = pd.read_csv("output/rhc_queens_reliability.csv", index_col=0)
-# plot_comparison(df_rhc, df_sa, df_ga, df_mimic, "Number of Queens", "Mean Fitness Ratio", "Fitnes Ratio", y_name_alternate="Fitness Ratio", error_name="STD Fitness Ratio")
-# plot_comparison(df_rhc, df_sa, df_ga, df_mimic, "Number of Queens", "Mean Fitness Ratio", "Fitnes Ratio", y_name_alternate="Fitness Ratio", error_name="STD Fitness Ratio")
-
-
-# plot_nn_gridsearches()
-# plot_all_gridsearches("fourpeaks")
-# plot_all_comparisons("tsp", "Cities")
-# plot_all_gridsearches("knapsack")
-# plot_all_gridsearches("flipflop")
-# plot_all_gridsearches("fourpeaks")
-# plot_sa_gsearch('output/sa_knapsack_gsresults.csv','Test.png','Test')
-# df = pd.read_csv('output/mimic_knapsack_gsresults.csv', index_col=0)
-# plot_all_comparisons("knapsack", "Number of Items")
-# plot_all_comparisons("fourpeaks", "Size of Problem Space (bits)")
-
-
-# plot_nn_gridsearches()
 def generate_all_plots():
 
-    plot_nn_lc('ga', title='Genetic Algorithm Learning Curve')
-    plot_nn_lc('gs', title='Gradient Descent Learning Curve')
-    plot_nn_lc('rhc', title='RHC Learning Curve')
-    plot_nn_lc('sa', title='SA Learning Curve')
+    plot_nn_lc("ga", title="Genetic Algorithm Learning Curve")
+    plot_nn_lc("gs", title="Gradient Descent Learning Curve")
+    plot_nn_lc("rhc", title="RHC Learning Curve")
+    plot_nn_lc("sa", title="SA Learning Curve")
 
     plot_all_comparisons("knapsack", "Number of Items")
     plot_all_comparisons("fourpeaks", "Size of Problem Space (bits)")
     plot_all_comparisons("queens", "N-Queens")
 
+    plot_all_gridsearches("knapsack")
+    plot_all_gridsearches("queens")
+    plot_all_gridsearches("fourpeaks")
 
-    plot_all_gridsearches('knapsack')
-    plot_all_gridsearches('queens')
-    plot_all_gridsearches('fourpeaks')
-    
-    df = generate_nn_comparison_table('output')
+    df = generate_nn_comparison_table("output")
     print("Final Results for Neural Network Experiment")
     print(df)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     generate_all_plots()
