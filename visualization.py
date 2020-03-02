@@ -418,8 +418,8 @@ def generate_nn_comparison_table(output_dir):
     srs = []
     for algo in algos:
         filename = os.path.join(output_dir, f"{algo}_nn_results.csv")
-        algo_df = pd.read_csv(filename, index_col=0).T
-        serie = pd.Series(algo_df.values[0], index=algo_df.columns)
+        algo_df = pd.read_csv(filename, index_col=0)
+        serie = algo_df.mean(axis=1)
 
         srs.append(serie)
 

@@ -209,8 +209,17 @@ def collect_nn_results(
 
         for i in tqdm.tqdm(range(runs)):
             # Collect train and test scores
-            nn.random_state = i
+            if algo != 'gs':
+                nn.random_state = i
+
             start = datetime.datetime.now()
+            if algo == 'gs':
+                nn = MLPClassifier(
+                    hidden_layer_sizes=[64, 64],
+                    learning_rate_init=0.0001,
+                    max_iter=max_iters,
+                )
+
             nn.fit(Xtrain, ytrain)
             end = datetime.datetime.now()
 
@@ -316,13 +325,13 @@ def run_all():
     )
     ga_results = collect_grid_search_data("genetic_alg", "output/ga_nn_gsresults.csv")
     print("Extracting Gradient Descent LC")
-    collect_nn_results(X, y, "gs", "output", extract_params=False, max_iters=2000)
+    collect_nn_results(X, y, "gs", "output", extract_params=False, max_iters=2000, collect_lc=True, collect_final_results=True)
     print("Extracting Genetic Alg LC")
-    collect_nn_results(X, y, "ga", "output", extract_params=True, max_iters=2000)
+    collect_nn_results(X, y, "ga", "output", extract_params=True, max_iters=2000, collect_lc=True, collect_final_results=True)
     print("Extracting Random Hill Climb LC")
-    collect_nn_results(X, y, "rhc", "output", extract_params=True, max_iters=2000)
+    collect_nn_results(X, y, "rhc", "output", extract_params=True, max_iters=2000, collect_lc=True, collect_final_results=True)
     print("Extracting Simulated Annealling LC")
-    collect_nn_results(X, y, "sa", "output", extract_params=True, max_iters=2000)
+    collect_nn_results(X, y, "sa", "output", extract_params=True, max_iters=2000, collect_lc=True, collect_final_results=True)
 
 
 if __name__ == "__main__":
@@ -334,39 +343,39 @@ if __name__ == "__main__":
         "output",
         extract_params=False,
         max_iters=2000,
-        collect_lc=False,
+        collect_lc=True,
         collect_final_results=True,
     )
-    print("Extracting Genetic Alg LC")
-    collect_nn_results(
-        X,
-        y,
-        "ga",
-        "output",
-        extract_params=True,
-        max_iters=2000,
-        collect_lc=False,
-        collect_final_results=True,
-    )
-    print("Extracting Random Hill Climb LC")
-    collect_nn_results(
-        X,
-        y,
-        "rhc",
-        "output",
-        extract_params=True,
-        max_iters=2000,
-        collect_lc=False,
-        collect_final_results=True,
-    )
-    print("Extracting Simulated Annealling LC")
-    collect_nn_results(
-        X,
-        y,
-        "sa",
-        "output",
-        extract_params=True,
-        max_iters=2000,
-        collect_lc=False,
-        collect_final_results=True,
-    )
+    # print("Extracting Genetic Alg LC")
+    # collect_nn_results(
+    #     X,
+    #     y,
+    #     "ga",
+    #     "output",
+    #     extract_params=True,
+    #     max_iters=2000,
+    #     collect_lc=False,
+    #     collect_final_results=True,
+    # )
+    # print("Extracting Random Hill Climb LC")
+    # collect_nn_results(
+    #     X,
+    #     y,
+    #     "rhc",
+    #     "output",
+    #     extract_params=True,
+    #     max_iters=2000,
+    #     collect_lc=False,
+    #     collect_final_results=True,
+    # )
+    # print("Extracting Simulated Annealling LC")
+    # collect_nn_results(
+    #     X,
+    #     y,
+    #     "sa",
+    #     "output",
+    #     extract_params=True,
+    #     max_iters=2000,
+    #     collect_lc=False,
+    #     collect_final_results=True,
+    # )
