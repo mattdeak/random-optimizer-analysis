@@ -111,7 +111,7 @@ def grid_search_nn(algo):
             results[f"Train_F1"] = train_f1_score
             results[f"Val_F1"] = val_f1_score
             results[f"Train_Time"] = train_time
-            results[f"Final_Loss"] = -nn.fitness_curve_[-1]
+            results[f"Final_Loss"] = -nn.fitness_curve[-1]
             results[f"Iterations"] = iterations
             results[f"Fold"] = j
 
